@@ -38,6 +38,7 @@ class PaperResponse(PaperBase):
     """Schema for returning a paper retrieved from the database."""
     id: int = Field(..., description="Unique persistent identifier")
     pdf_file_path: Optional[str] = None
+    pdf_url: Optional[str] = Field(None, description="Safe endpoint URL to view or stream the PDF")
     has_pdf: bool = Field(False, description="True if local PDF file is associated")
     has_summary: bool = Field(False, description="True if LLM summary has been generated")
     created_at: Optional[datetime] = None

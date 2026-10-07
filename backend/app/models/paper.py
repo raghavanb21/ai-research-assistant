@@ -53,6 +53,13 @@ class Paper(Base):
         return bool(self.pdf_file_path and len(self.pdf_file_path.strip()) > 0)
 
     @property
+    def pdf_url(self) -> Optional[str]:
+        """Safe relative backend API endpoint to view/stream the PDF without leaking filesystem paths."""
+        if self.has_pdf and self.id:
+            return f"/api/pdf/{self.id}/view"
+        return None
+
+    @property
     def has_summary(self) -> bool:
         """Indicates if an LLM summary has been generated for this paper."""
         return bool(self.summary is not None)

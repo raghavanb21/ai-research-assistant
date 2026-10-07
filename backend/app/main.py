@@ -7,6 +7,7 @@ from app.config import settings
 from app.database import init_db, get_db
 from app.routers.search import router as search_router
 from app.routers.papers import router as papers_router
+from app.routers.pdf import router as pdf_router
 
 
 @asynccontextmanager
@@ -36,6 +37,7 @@ app.add_middleware(
 # Include API Routers
 app.include_router(search_router)
 app.include_router(papers_router)
+app.include_router(pdf_router)
 
 
 @app.get("/")
