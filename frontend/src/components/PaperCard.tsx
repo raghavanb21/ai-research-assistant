@@ -1,15 +1,44 @@
 import React, { useState } from 'react';
-import { ExternalLink, Calendar, Users, FileText, ChevronDown, ChevronUp } from 'lucide-react';
+import { 
+  ExternalLink, 
+  Calendar, 
+  Users, 
+  FileText, 
+  ChevronDown, 
+  ChevronUp, 
+  BookmarkPlus, 
+  BookmarkCheck, 
+  Trash2, 
+  Loader2,
+  Check,
+  AlertTriangle,
+  Eye
+} from 'lucide-react';
 import { Paper } from '../types';
 
 interface PaperCardProps {
   paper: Paper;
-  onSave?: (paper: Paper) => void;
+  mode?: 'search' | 'library';
   isSaved?: boolean;
+  isSaving?: boolean;
+  isDeleting?: boolean;
+  onSave?: (paper: Paper) => void;
+  onDelete?: (paperId: number) => void;
+  onPreviewPDF?: (paper: Paper) => void;
 }
 
-export const PaperCard: React.FC<PaperCardProps> = ({ paper }) => {
+export const PaperCard: React.FC<PaperCardProps> = ({ 
+  paper, 
+  mode = 'search',
+  isSaved = false,
+  isSaving = false,
+  isDeleting = false,
+  onSave,
+  onDelete,
+  onPreviewPDF
+}) => {
   const [isExpanded, setIsExpanded] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   // Defensive field processing
   const authorsList = paper.authors && paper.authors.length > 0
@@ -27,12 +56,59 @@ export const PaperCard: React.FC<PaperCardProps> = ({ paper }) => {
 
   const isLongAbstract = hasAbstract && abstractText.length > 280;
 
+  const handleSaveClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (onSave && !isSaved && !isSaving) {
+      onSave(paper);
+    }
+  };
+
+  const handleDeleteClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!showDeleteConfirm) {
+      setShowDeleteConfirm(true);
+      return;
+    }
+    if (onDelete && paper.id) {
+      onDelete(paper.id);
+      setShowDeleteConfirm(false);
+    }
+  };
+
+  const handleCancelDelete = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setShowDeleteConfirm(false);
+  };
+
+  const handlePreviewPDF = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (onPreviewPDF) {
+      onPreviewPDF(paper);
+    } else {
+      const pdfUrl = paper.pdf_url || (paper.id ? `/api/pdf/${paper.id}/view` : null);
+      if (pdfUrl) {
+        window.open(pdfUrl, '_blank', 'noopener,noreferrer');
+      }
+    }
+  };
+
+  const formattedSavedDate = paper.created_at
+    ? new Date(paper.created_at).toLocaleDateString(undefined, {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric'
+      })
+    : null;
+
+  const isUploadedPDF = Boolean(paper.source === 'upload' || paper.has_pdf || paper.pdf_url);
+  const resolvedPdfUrl = paper.pdf_url || (paper.id ? `/api/pdf/${paper.id}/view` : null);
+
   return (
-    <article className="paper-card">
+    <article className={`paper-card ${mode === 'library' ? 'library-card' : ''} ${isSaved ? 'is-saved' : ''}`}>
       <div className="paper-card-header">
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
           <span className={`source-badge badge-${paper.source}`}>
-            {paper.source === 'openalex' ? 'OpenAlex' : paper.source === 'arxiv' ? 'arXiv' : paper.source}
+            {paper.source === 'openalex' ? 'OpenAlex' : paper.source === 'arxiv' ? 'arXiv' : paper.source === 'upload' ? 'PDF Upload' : paper.source}
           </span>
           {paper.arxiv_id && (
             <span className="source-badge badge-meta">
@@ -44,24 +120,42 @@ export const PaperCard: React.FC<PaperCardProps> = ({ paper }) => {
               DOI:{paper.doi}
             </span>
           )}
+          {mode === 'library' && paper.id && (
+            <span className="source-badge badge-id">
+              ID #{paper.id}
+            </span>
+          )}
         </div>
 
-        {paper.url ? (
-          <a
-            href={paper.url}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="paper-link-btn"
-            title="Open original paper link"
-          >
-            <span>View Paper</span>
-            <ExternalLink size={14} />
-          </a>
-        ) : (
-          <span className="paper-link-disabled" title="No direct paper link available">
-            No Link Available
-          </span>
-        )}
+        {/* Paper Link / PDF View Action */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+          {paper.url ? (
+            <a
+              href={paper.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="paper-link-btn"
+              title="Open original paper link in external repository"
+            >
+              <span>View Paper</span>
+              <ExternalLink size={14} />
+            </a>
+          ) : isUploadedPDF && resolvedPdfUrl ? (
+            <button
+              type="button"
+              className="paper-pdf-btn"
+              onClick={handlePreviewPDF}
+              title="Preview uploaded PDF research paper"
+            >
+              <FileText size={14} />
+              <span>Preview PDF</span>
+            </button>
+          ) : (
+            <span className="paper-link-disabled" title="No direct paper link available">
+              No Link Available
+            </span>
+          )}
+        </div>
       </div>
 
       <h3 className="paper-card-title">{paper.title}</h3>
@@ -79,6 +173,11 @@ export const PaperCard: React.FC<PaperCardProps> = ({ paper }) => {
             {publicationYear}
           </span>
         </div>
+        {mode === 'library' && formattedSavedDate && (
+          <div className="meta-item meta-saved-date">
+            <span>Saved {formattedSavedDate}</span>
+          </div>
+        )}
       </div>
 
       <div className="paper-card-abstract">
@@ -98,6 +197,105 @@ export const PaperCard: React.FC<PaperCardProps> = ({ paper }) => {
             <span>{isExpanded ? 'Show less' : 'Read full abstract'}</span>
             {isExpanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
           </button>
+        )}
+      </div>
+
+      {/* Action Footer */}
+      <div className="paper-card-footer">
+        {mode === 'search' ? (
+          <div>
+            {isSaved ? (
+              <span className="saved-indicator-pill">
+                <Check size={14} />
+                <span>Saved in Library</span>
+              </span>
+            ) : (
+              <button
+                type="button"
+                className="save-action-btn"
+                onClick={handleSaveClick}
+                disabled={isSaving}
+                title="Save paper to persistent local database"
+              >
+                {isSaving ? (
+                  <>
+                    <Loader2 size={15} className="spinner" />
+                    <span>Saving...</span>
+                  </>
+                ) : (
+                  <>
+                    <BookmarkPlus size={15} />
+                    <span>Save to Library</span>
+                  </>
+                )}
+              </button>
+            )}
+          </div>
+        ) : (
+          <div className="library-card-actions">
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
+              <div className="library-status-indicator">
+                <BookmarkCheck size={15} style={{ color: 'var(--accent-success)' }} />
+                <span>In Persistent DB</span>
+              </div>
+              {isUploadedPDF && (
+                <button
+                  type="button"
+                  className="card-quick-preview-btn"
+                  onClick={handlePreviewPDF}
+                  title="Open PDF Preview"
+                >
+                  <Eye size={13} />
+                  <span>View PDF</span>
+                </button>
+              )}
+            </div>
+
+            {showDeleteConfirm ? (
+              <div className="delete-confirm-box">
+                <span className="delete-confirm-text">
+                  <AlertTriangle size={13} style={{ color: 'var(--accent-danger)' }} />
+                  <span>Delete paper?</span>
+                </span>
+                <button
+                  type="button"
+                  className="confirm-delete-btn"
+                  onClick={handleDeleteClick}
+                  disabled={isDeleting}
+                >
+                  {isDeleting ? <Loader2 size={13} className="spinner" /> : 'Yes, Delete'}
+                </button>
+                <button
+                  type="button"
+                  className="cancel-delete-btn"
+                  onClick={handleCancelDelete}
+                  disabled={isDeleting}
+                >
+                  Cancel
+                </button>
+              </div>
+            ) : (
+              <button
+                type="button"
+                className="delete-action-btn"
+                onClick={handleDeleteClick}
+                disabled={isDeleting}
+                title="Remove paper from persistent library"
+              >
+                {isDeleting ? (
+                  <>
+                    <Loader2 size={14} className="spinner" />
+                    <span>Deleting...</span>
+                  </>
+                ) : (
+                  <>
+                    <Trash2 size={14} />
+                    <span>Remove</span>
+                  </>
+                )}
+              </button>
+            )}
+          </div>
         )}
       </div>
     </article>

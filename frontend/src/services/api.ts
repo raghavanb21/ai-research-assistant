@@ -20,10 +20,23 @@ export async function searchPapers(query: string, source = 'arxiv', limit = 10):
   return res.json();
 }
 
-export async function getSavedPapers(): Promise<Paper[]> {
-  const res = await fetch(`${API_BASE}/papers`);
+export async function getSavedPapers(query?: string, source?: string): Promise<Paper[]> {
+  const params = new URLSearchParams();
+  if (query && query.trim()) params.append('q', query.trim());
+  if (source && source !== 'all') params.append('source', source);
+
+  const queryString = params.toString() ? `?${params.toString()}` : '';
+  const res = await fetch(`${API_BASE}/papers${queryString}`);
   if (!res.ok) {
     throw new Error(`Failed to fetch saved papers: ${res.status}`);
+  }
+  return res.json();
+}
+
+export async function getPaperById(paperId: number): Promise<Paper> {
+  const res = await fetch(`${API_BASE}/papers/${paperId}`);
+  if (!res.ok) {
+    throw new Error(`Failed to fetch paper with ID ${paperId}`);
   }
   return res.json();
 }
@@ -47,6 +60,22 @@ export async function deletePaper(paperId: number): Promise<{ success: boolean }
   });
   if (!res.ok) {
     throw new Error(`Failed to delete paper`);
+  }
+  return res.json();
+}
+
+export async function uploadPDF(file: File): Promise<Paper> {
+  const formData = new FormData();
+  formData.append('file', file);
+
+  const res = await fetch(`${API_BASE}/pdf/upload`, {
+    method: 'POST',
+    body: formData,
+  });
+
+  if (!res.ok) {
+    const errorData = await res.json().catch(() => ({}));
+    throw new Error(errorData.detail || `Upload failed with status: ${res.status}`);
   }
   return res.json();
 }

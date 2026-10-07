@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { Search, Sparkles, AlertCircle, Loader2, X, SlidersHorizontal, BookSearch } from 'lucide-react';
 import { Paper } from '../types';
 import { searchPapers } from '../services/api';
@@ -12,7 +12,12 @@ const SAMPLE_QUERIES = [
   'Quantum error correction'
 ];
 
-export const SearchPanel: React.FC = () => {
+interface SearchPanelProps {
+  savedPapers: Paper[];
+  onSavePaper: (paper: Paper) => Promise<void>;
+}
+
+export const SearchPanel: React.FC<SearchPanelProps> = ({ savedPapers, onSavePaper }) => {
   const [query, setQuery] = useState('');
   const [source, setSource] = useState<'openalex' | 'arxiv' | 'all'>('openalex');
   const [limit, setLimit] = useState<number>(10);
@@ -21,6 +26,31 @@ export const SearchPanel: React.FC = () => {
   const [warning, setWarning] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [searched, setSearched] = useState(false);
+  const [savingPaperKey, setSavingPaperKey] = useState<string | null>(null);
+
+  // Set of identifiers for fast lookup of already saved papers
+  const savedKeysSet = useMemo(() => {
+    const keys = new Set<string>();
+    for (const p of savedPapers) {
+      if (p.arxiv_id) keys.add(`arxiv:${p.arxiv_id.toLowerCase()}`);
+      if (p.doi) keys.add(`doi:${p.doi.toLowerCase()}`);
+      if (p.title) keys.add(`title:${p.title.trim().toLowerCase()}`);
+    }
+    return keys;
+  }, [savedPapers]);
+
+  const getPaperKey = (paper: Paper): string => {
+    if (paper.arxiv_id) return `arxiv:${paper.arxiv_id.toLowerCase()}`;
+    if (paper.doi) return `doi:${paper.doi.toLowerCase()}`;
+    return `title:${paper.title.trim().toLowerCase()}`;
+  };
+
+  const isPaperSaved = (paper: Paper): boolean => {
+    if (paper.arxiv_id && savedKeysSet.has(`arxiv:${paper.arxiv_id.toLowerCase()}`)) return true;
+    if (paper.doi && savedKeysSet.has(`doi:${paper.doi.toLowerCase()}`)) return true;
+    if (paper.title && savedKeysSet.has(`title:${paper.title.trim().toLowerCase()}`)) return true;
+    return false;
+  };
 
   const handleSearch = async (e?: React.FormEvent, customQuery?: string) => {
     if (e) e.preventDefault();
@@ -46,6 +76,16 @@ export const SearchPanel: React.FC = () => {
       setError(err.message || 'Failed to fetch search results.');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleSave = async (paper: Paper) => {
+    const key = getPaperKey(paper);
+    setSavingPaperKey(key);
+    try {
+      await onSavePaper(paper);
+    } finally {
+      setSavingPaperKey(null);
     }
   };
 
@@ -218,9 +258,21 @@ export const SearchPanel: React.FC = () => {
             </div>
           ) : (
             <div className="papers-grid">
-              {results.map((paper, idx) => (
-                <PaperCard key={`${paper.arxiv_id || paper.doi || idx}-${idx}`} paper={paper} />
-              ))}
+              {results.map((paper, idx) => {
+                const key = getPaperKey(paper);
+                const saved = isPaperSaved(paper);
+                const isSaving = savingPaperKey === key;
+                return (
+                  <PaperCard 
+                    key={`${paper.arxiv_id || paper.doi || idx}-${idx}`} 
+                    paper={paper}
+                    mode="search"
+                    isSaved={saved}
+                    isSaving={isSaving}
+                    onSave={handleSave}
+                  />
+                );
+              })}
             </div>
           )}
         </div>

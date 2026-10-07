@@ -11,6 +11,10 @@ ENV/
 env/
 
 # Database and uploaded storage
+data/
+data/*.db
+data/*.db-journal
+data/pdfs/*
 backend/data/*.db
 backend/data/*.db-journal
 backend/data/pdfs/*

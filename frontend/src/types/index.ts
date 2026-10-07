@@ -9,7 +9,10 @@ export interface Paper {
   arxiv_id?: string | null;
   source: 'openalex' | 'arxiv' | 'upload' | string;
   pdf_file_path?: string | null;
+  pdf_url?: string | null;
   full_text?: string | null;
+  has_pdf?: boolean;
+  has_summary?: boolean;
   created_at?: string;
   updated_at?: string;
 }
