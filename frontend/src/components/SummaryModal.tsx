@@ -280,52 +280,61 @@ export const SummaryModal: React.FC<SummaryModalProps> = ({
         </div>
 
         {/* Modal Footer Actions */}
-        <div className="modal-footer" style={{ justifyContent: 'space-between' }}>
-          <div style={{ display: 'flex', gap: '0.65rem' }}>
+        <div className="summary-modal-footer">
+          {/* Left group: secondary actions */}
+          <div className="summary-footer-left">
             <button
               type="button"
-              className="copy-summary-btn"
+              className={`summary-action-btn summary-copy-btn${copied ? ' copied' : ''}`}
               onClick={handleCopySummary}
               disabled={!summary || loading}
               title="Copy summary to clipboard"
             >
               {copied ? (
                 <>
-                  <Check size={16} style={{ color: 'var(--accent-success)' }} />
-                  <span style={{ color: 'var(--accent-success)' }}>Copied!</span>
+                  <Check size={15} />
+                  <span>Copied!</span>
                 </>
               ) : (
                 <>
-                  <Copy size={16} />
-                  <span>Copy Summary</span>
+                  <Copy size={15} />
+                  <span>Copy</span>
                 </>
               )}
             </button>
 
             <button
               type="button"
-              className="regenerate-summary-btn"
+              className="summary-action-btn summary-regen-btn"
               onClick={() => fetchOrGenerateSummary(true)}
               disabled={loading}
               title="Regenerate summary with fresh LLM analysis"
             >
               <RefreshCw size={15} className={loading ? 'spinner' : ''} />
-              <span>Regenerate</span>
+              <span>{loading ? 'Generating…' : 'Regenerate'}</span>
             </button>
           </div>
 
-          <div style={{ display: 'flex', gap: '0.65rem' }}>
+          {/* Right group: primary CTA + dismiss */}
+          <div className="summary-footer-right">
             <button
               type="button"
-              className="ask-qa-transition-btn"
+              className="summary-qa-cta-btn"
               onClick={handleSwitchToQA}
               title="Open interactive Q&A session about this paper"
             >
               <MessageSquare size={16} />
-              <span>Ask Questions About Paper</span>
+              <span>Ask Questions</span>
             </button>
-            <button type="button" className="btn-secondary" onClick={onClose}>
-              Close
+
+            <button
+              type="button"
+              className="summary-close-btn"
+              onClick={onClose}
+              title="Close summary"
+            >
+              <X size={15} />
+              <span>Close</span>
             </button>
           </div>
         </div>

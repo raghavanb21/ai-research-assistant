@@ -1,44 +1,49 @@
 # AI Research Assistant
 
-A modern, full-stack application designed to help researchers, students, and engineers discover, organize, read, summarize, and query academic research papers.
+A modern, full-stack application for researchers, students, and engineers to **discover**, **organize**, **read**, **summarize**, and **query** academic papers — all from a single local interface.
 
-## Features Overview
-- **100% Free Public Paper Search**: Search OpenAlex (250M+ papers) and arXiv preprints with zero required paid API keys.
-- **Defensive Metadata Display**: Robust fallback rendering for missing authors, years, abstracts, and external links.
-- **Persistent Local Library**: Save papers to a persistent local SQLite database across browser refreshes and server restarts.
-- **Local PDF Processing**: Upload research papers in PDF format with 100% local text & font-heuristic metadata extraction (via PyMuPDF). Zero document contents leave your machine.
-- **Content-Grounded AI Summarization**: Generate structured summaries (Key Contributions, Methodology, Findings, Limitations) grounded strictly in the full paper text.
-- **Interactive Paper Q&A**: Ask natural language questions about any paper in your library with context citations.
+---
+
+## Features
+
+| Feature | Description |
+| :--- | :--- |
+| 🔍 **Paper Search** | Search 250M+ papers via OpenAlex and arXiv — no paid API keys needed |
+| 📚 **Personal Library** | Save papers to a persistent local SQLite database; survives restarts |
+| 📄 **PDF Upload** | Upload local PDF research papers; metadata (title, authors, year, abstract) is auto-extracted |
+| 👁️ **PDF Viewer** | Preview uploaded PDFs directly in the browser via the backend's secure `/api/pdf/view/{id}` endpoint |
+| 🤖 **AI Summarization** | Generate structured summaries (Key Takeaways, Methodology, Findings, Limitations) grounded in the paper's full text or abstract |
+| 💬 **Interactive Q&A** | Ask natural-language questions about any saved paper; answers are strictly grounded in the paper content with anti-hallucination guardrails |
+| 🌗 **Light / Dark Theme** | Toggleable theme with system-friendly light mode as the default |
 
 ---
 
 ## System Architecture
 
 ```
-+--------------------------------------------------------------------+
-|                         Frontend (React + Vite)                    |
-|  +---------------------+  +--------------------+  +--------------+ |
-|  | Paper Search View   |  | Library / Grid View|  | Paper Reader | |
-|  +---------------------+  +--------------------+  +--------------+ |
-|  | Summary Panel       |  | Interactive Q&A    |  | PDF Uploader | |
-|  +---------------------+  +--------------------+  +--------------+ |
-+---------------------------------+----------------------------------+
-                                  | HTTP / REST (JSON)
-                                  v
-+--------------------------------------------------------------------+
-|                         Backend (FastAPI)                          |
-|  +---------------------------------------------------------------+ |
-|  | Routers: /api/search, /api/papers, /api/pdf, /api/ai          | |
-|  +---------------------------------------------------------------+ |
-|  | Services: arXiv/OpenAlex Search, PyMuPDF Extractor, LLM Adapter | |
-|  +---------------------------------------------------------------+ |
-|  | Data Layer: SQLAlchemy ORM + SQLite (assistant.db)             | |
-|  +---------------------------------------------------------------+ |
-|  | Local Storage: ./data/pdfs/                                   | |
-+--------------------------------------------------------------------+
+┌─────────────────────────────────────────────────────────────────┐
+│                     Frontend  (React + Vite)                    │
+│                                                                 │
+│  SearchPanel  │  LibraryPanel  │  PaperCard  │  PDFUploadModal  │
+│  SummaryModal │  QAModal       │  PDFViewerModal                │
+└──────────────────────────┬──────────────────────────────────────┘
+                           │  HTTP / REST (JSON)
+                           ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                      Backend  (FastAPI)                         │
+│                                                                 │
+│  Routers                                                        │
+│    /api/search   → search_service  (OpenAlex + arXiv)          │
+│    /api/papers   → paper_service   (CRUD, library)             │
+│    /api/pdf      → pdf_service     (upload, view, extract)     │
+│    /api/ai       → llm_service     (summarize, Q&A)            │
+│                                                                 │
+│  Data Layer: SQLAlchemy ORM + SQLite  (data/assistant.db)      │
+│  PDF Storage:  data/pdfs/                                       │
+└─────────────────────────────────────────────────────────────────┘
 ```
 
-Detailed design and architecture specifications can be found in [`docs/architecture.md`](docs/architecture.md).
+For full design decisions and API contracts, see [`docs/architecture.md`](docs/architecture.md).
 
 ---
 
@@ -46,67 +51,107 @@ Detailed design and architecture specifications can be found in [`docs/architect
 
 ```
 ai4se/
-├── .env.example
+├── .env.example                 # Environment variable template
 ├── .gitignore
-├── AGENT_LOG.md                # Development trajectory and engineering logs
-├── README.md                   # This file
+├── README.md                    # This file
+├── AGENT_LOG.md                 # Development trajectory & engineering log
 ├── docs/
-│   └── architecture.md         # System specification & architecture
+│   └── architecture.md          # System specification & architecture
+├── data/                        # Auto-created at runtime
+│   ├── assistant.db             # SQLite database
+│   └── pdfs/                   # Uploaded PDF files
 ├── backend/
-│   ├── app/
-│   │   ├── config.py           # Application settings
-│   │   ├── database.py         # SQLAlchemy engine & session factory
-│   │   ├── main.py             # FastAPI entry point & CORS
-│   │   ├── models/             # SQLAlchemy ORM models
-│   │   ├── schemas/            # Pydantic validation schemas
-│   │   ├── routers/            # API endpoints
-│   │   └── services/           # Search, PDF extraction, and LLM services
 │   ├── requirements.txt
-│   └── data/                   # SQLite database and uploaded PDFs
+│   └── app/
+│       ├── main.py              # FastAPI entry point, CORS, router registration
+│       ├── config.py            # Pydantic settings (reads .env)
+│       ├── database.py          # SQLAlchemy engine & session factory
+│       ├── models/              # ORM table definitions (papers, summaries, qa_messages)
+│       ├── schemas/             # Pydantic request/response schemas
+│       ├── routers/
+│       │   ├── search.py        # GET /api/search
+│       │   ├── papers.py        # GET/POST/DELETE /api/papers
+│       │   ├── pdf.py           # POST /api/pdf/upload, GET /api/pdf/view/{id}
+│       │   └── ai.py            # POST /api/ai/summarize, /api/ai/ask, GET /api/ai/history
+│       └── services/
+│           ├── search_service.py   # OpenAlex + arXiv API clients
+│           ├── paper_service.py    # Library CRUD logic
+│           ├── pdf_service.py      # PyMuPDF extraction & font-heuristic metadata
+│           └── llm_service.py      # Google Gemini / OpenAI adapter with model fallback
 └── frontend/
     ├── index.html
     ├── package.json
     ├── vite.config.ts
     └── src/
-        ├── index.css           # Global design system & theme tokens
-        ├── App.tsx             # Root layout & navigation
-        ├── components/         # React components
-        ├── services/           # API fetch client
-        └── types/              # TypeScript interfaces
+        ├── App.tsx              # Root layout, theme toggle, modal orchestration
+        ├── index.css            # Design system, CSS variables, light/dark themes
+        ├── types/               # TypeScript interfaces (Paper, Summary, QAMessage …)
+        ├── services/
+        │   └── api.ts           # Typed fetch wrappers for all backend endpoints
+        └── components/
+            ├── SearchPanel.tsx      # Search form & results list
+            ├── LibraryPanel.tsx     # Saved papers grid / list view
+            ├── PaperCard.tsx        # Reusable paper card with actions
+            ├── PDFUploadModal.tsx   # Drag-and-drop PDF uploader
+            ├── PDFViewerModal.tsx   # In-browser PDF preview (iframe)
+            ├── SummaryModal.tsx     # AI summary panel
+            └── QAModal.tsx          # Interactive Q&A chat panel
 ```
 
 ---
 
-## Getting Started & Setup
+## Prerequisites
 
-### Prerequisites
-- **Python 3.10+** (Tested on Python 3.13)
-- **Node.js 18+** & **npm**
+| Requirement | Version |
+| :--- | :--- |
+| Python | 3.10+ (tested on 3.13) |
+| Node.js | 18+ |
+| npm | 9+ |
 
-### 1. Backend Setup
+---
+
+## Setup
+
+### 1. Clone the repository
 
 ```bash
-# Navigate to backend directory
+git clone https://github.com/raghavanb21/ai-research-assistant.git
+cd ai-research-assistant
+```
+
+### 2. Configure environment variables
+
+```bash
+cp .env.example backend/.env
+```
+
+Open `backend/.env` and fill in at minimum:
+
+```env
+GEMINI_API_KEY=your_google_gemini_api_key   # Required for AI features
+```
+
+All other values have working defaults — see the [Environment Variables](#environment-variables) table below.
+
+> **Get a free Gemini API key:** https://aistudio.google.com/app/apikey
+
+### 3. Backend setup
+
+```bash
 cd backend
 
-# Create and activate virtual environment
+# Create and activate a virtual environment
 python3 -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
+source venv/bin/activate        # Windows: venv\Scripts\activate
 
 # Install Python dependencies
 pip install -r requirements.txt
-
-# Create environment configuration
-cp ../.env.example .env
 ```
 
-### 2. Frontend Setup
+### 4. Frontend setup
 
 ```bash
-# Navigate to frontend directory
 cd ../frontend
-
-# Install Node dependencies
 npm install
 ```
 
@@ -114,45 +159,117 @@ npm install
 
 ## Running the Application
 
-### Start the Backend Server
+Open **two terminal windows** and run each service:
+
+### Terminal 1 — Backend
 
 ```bash
 cd backend
 source venv/bin/activate
 uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 ```
-- API Docs (Swagger UI): `http://localhost:8000/docs`
-- Health Check: `http://localhost:8000/api/health`
 
-### Start the Frontend Dev Server
+| Endpoint | URL |
+| :--- | :--- |
+| Application API | `http://localhost:8000` |
+| Swagger UI (API Docs) | `http://localhost:8000/docs` |
+| Health Check | `http://localhost:8000/api/health` |
+
+### Terminal 2 — Frontend
 
 ```bash
 cd frontend
 npm run dev
 ```
-- Frontend Web App: `http://localhost:5173`
+
+| Endpoint | URL |
+| :--- | :--- |
+| Web Application | `http://localhost:5173` |
 
 ---
 
 ## Environment Variables
 
-| Variable | Default | Description |
+All variables are read from `backend/.env`. Copy from `.env.example` to get started.
+
+| Variable | Default | Required | Description |
+| :--- | :--- | :---: | :--- |
+| `HOST` | `0.0.0.0` | | Backend bind host |
+| `PORT` | `8000` | | Backend port |
+| `DEBUG` | `true` | | Enable FastAPI debug mode |
+| `CORS_ORIGINS` | `http://localhost:5173,...` | | Comma-separated allowed frontend origins |
+| `DATABASE_URL` | `sqlite:///./data/assistant.db` | | SQLite database path |
+| `PDF_STORAGE_DIR` | `./data/pdfs` | | Directory for uploaded PDF files |
+| `LLM_PROVIDER` | `gemini` | | LLM backend: `gemini` or `openai` |
+| `LLM_MODEL` | `gemini-3.5-flash` | | Model identifier (overridden by fallback logic) |
+| `GEMINI_API_KEY` | — | (AI features) | Google Gemini API key |
+| `OPENAI_API_KEY` | — | (if using OpenAI) | OpenAI API key |
+
+> The `data/` directory (database + PDFs) is created automatically on first run. It is excluded from version control via `.gitignore`.
+
+---
+
+## Key Dependencies
+
+### Backend (`requirements.txt`)
+
+| Package | Purpose |
+| :--- | :--- |
+| `fastapi` | Web framework & API routing |
+| `uvicorn[standard]` | ASGI server |
+| `sqlalchemy` | ORM & database abstraction |
+| `pydantic` / `pydantic-settings` | Data validation & settings management |
+| `httpx` | Async HTTP client (OpenAlex & arXiv API calls) |
+| `pymupdf` | PDF text extraction & font-heuristic metadata parsing |
+| `google-genai` | Google Gemini API client |
+| `openai` | OpenAI API client (alternative LLM provider) |
+| `python-multipart` | Multipart form handling for file uploads |
+| `pytest` | Test framework |
+
+### Frontend (`package.json`)
+
+| Package | Purpose |
+| :--- | :--- |
+| `react` + `react-dom` | UI framework |
+| `vite` | Build tool & dev server |
+| `typescript` | Type safety |
+| `lucide-react` | Icon library |
+
+---
+
+## API Reference
+
+All endpoints are prefixed with `/api`.
+
+| Method | Endpoint | Description |
 | :--- | :--- | :--- |
-| `DATABASE_URL` | `sqlite:///./data/assistant.db` | Local SQLite database file path |
-| `PDF_STORAGE_DIR` | `./data/pdfs` | Directory for uploaded PDF documents |
-| `LLM_PROVIDER` | `gemini` | `gemini` or `openai` |
-| `GEMINI_API_KEY` | - | Google Gemini API Key (for summarization/Q&A) |
-| `OPENAI_API_KEY` | - | OpenAI API Key (alternative LLM provider) |
-| `LLM_MODEL` | `gemini-1.5-flash` | Model identifier |
-| `CORS_ORIGINS` | `http://localhost:5173,...` | Allowed frontend origins |
-| `PORT` | `8000` | Backend port |
+| `GET` | `/health` | Backend health check |
+| `GET` | `/search?query=...&source=...` | Search OpenAlex or arXiv |
+| `GET` | `/papers` | List all saved papers |
+| `POST` | `/papers` | Save a paper to the library |
+| `DELETE` | `/papers/{id}` | Remove a paper from the library |
+| `POST` | `/pdf/upload` | Upload a PDF file |
+| `GET` | `/pdf/view/{paper_id}` | Serve a stored PDF for browser viewing |
+| `POST` | `/ai/summarize/{paper_id}` | Generate (or regenerate) an AI summary |
+| `GET` | `/ai/summarize/{paper_id}` | Retrieve a cached summary |
+| `POST` | `/ai/ask/{paper_id}` | Ask a question about a paper |
+| `GET` | `/ai/history/{paper_id}` | Get Q&A conversation history |
+| `DELETE` | `/ai/history/{paper_id}` | Clear Q&A history for a paper |
+
+Full interactive documentation is available at `http://localhost:8000/docs` when the backend is running.
 
 ---
 
 ## Testing
 
-Backend test suites will be run in Phase 8:
 ```bash
 cd backend
-pytest tests/
+source venv/bin/activate
+pytest tests/ -v
 ```
+
+---
+
+## License
+
+This project is for academic and educational use.
