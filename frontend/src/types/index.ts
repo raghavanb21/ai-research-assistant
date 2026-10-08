@@ -35,6 +35,12 @@ export interface QAMessage {
   created_at?: string;
 }
 
+export interface QAHistoryResponse {
+  paper_id: number;
+  total_messages: number;
+  messages: QAMessage[];
+}
+
 export interface SearchResponse {
   query: string;
   count: number;

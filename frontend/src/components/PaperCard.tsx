@@ -7,13 +7,15 @@ import {
   ChevronDown, 
   ChevronUp, 
   BookmarkPlus, 
-  BookmarkCheck, 
   Trash2, 
   Loader2,
   Check,
   AlertTriangle,
-  Eye
+  Eye,
+  Sparkles,
+  MessageSquare
 } from 'lucide-react';
+
 import { Paper } from '../types';
 
 interface PaperCardProps {
@@ -25,6 +27,8 @@ interface PaperCardProps {
   onSave?: (paper: Paper) => void;
   onDelete?: (paperId: number) => void;
   onPreviewPDF?: (paper: Paper) => void;
+  onSummarize?: (paper: Paper) => void;
+  onQA?: (paper: Paper) => void;
 }
 
 export const PaperCard: React.FC<PaperCardProps> = ({ 
@@ -35,7 +39,9 @@ export const PaperCard: React.FC<PaperCardProps> = ({
   isDeleting = false,
   onSave,
   onDelete,
-  onPreviewPDF
+  onPreviewPDF,
+  onSummarize,
+  onQA
 }) => {
   const [isExpanded, setIsExpanded] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
@@ -92,6 +98,20 @@ export const PaperCard: React.FC<PaperCardProps> = ({
     }
   };
 
+  const handleSummarize = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (onSummarize) {
+      onSummarize(paper);
+    }
+  };
+
+  const handleQA = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (onQA) {
+      onQA(paper);
+    }
+  };
+
   const formattedSavedDate = paper.created_at
     ? new Date(paper.created_at).toLocaleDateString(undefined, {
         year: 'numeric',
@@ -123,6 +143,12 @@ export const PaperCard: React.FC<PaperCardProps> = ({
           {mode === 'library' && paper.id && (
             <span className="source-badge badge-id">
               ID #{paper.id}
+            </span>
+          )}
+          {paper.has_summary && (
+            <span className="source-badge badge-summary-ready" title="AI summary is already cached">
+              <Sparkles size={11} style={{ marginRight: 3 }} />
+              Summary Ready
             </span>
           )}
         </div>
@@ -203,12 +229,36 @@ export const PaperCard: React.FC<PaperCardProps> = ({
       {/* Action Footer */}
       <div className="paper-card-footer">
         {mode === 'search' ? (
-          <div>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', flexWrap: 'wrap', gap: '0.5rem' }}>
             {isSaved ? (
-              <span className="saved-indicator-pill">
-                <Check size={14} />
-                <span>Saved in Library</span>
-              </span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', flexWrap: 'wrap' }}>
+                <span className="saved-indicator-pill">
+                  <Check size={14} />
+                  <span>Saved in Library</span>
+                </span>
+                {onSummarize && paper.id && (
+                  <button
+                    type="button"
+                    className="ai-card-btn summarize-btn"
+                    onClick={handleSummarize}
+                    title="Generate AI summary of paper"
+                  >
+                    <Sparkles size={13} />
+                    <span>{paper.has_summary ? 'View Summary' : 'Summarize'}</span>
+                  </button>
+                )}
+                {onQA && paper.id && (
+                  <button
+                    type="button"
+                    className="ai-card-btn qa-btn"
+                    onClick={handleQA}
+                    title="Ask natural-language questions about this paper"
+                  >
+                    <MessageSquare size={13} />
+                    <span>Ask Q&A</span>
+                  </button>
+                )}
+              </div>
             ) : (
               <button
                 type="button"
@@ -233,11 +283,34 @@ export const PaperCard: React.FC<PaperCardProps> = ({
           </div>
         ) : (
           <div className="library-card-actions">
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
-              <div className="library-status-indicator">
-                <BookmarkCheck size={15} style={{ color: 'var(--accent-success)' }} />
-                <span>In Persistent DB</span>
-              </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+              {/* AI Summarize Action */}
+              {onSummarize && (
+                <button
+                  type="button"
+                  className={`ai-card-btn summarize-btn ${paper.has_summary ? 'active' : ''}`}
+                  onClick={handleSummarize}
+                  title="Generate or view structured LLM summary"
+                >
+                  <Sparkles size={13} />
+                  <span>{paper.has_summary ? 'View Summary' : 'Summarize'}</span>
+                </button>
+              )}
+
+              {/* AI Q&A Action */}
+              {onQA && (
+                <button
+                  type="button"
+                  className="ai-card-btn qa-btn"
+                  onClick={handleQA}
+                  title="Ask natural-language questions about this paper"
+                >
+                  <MessageSquare size={13} />
+                  <span>Ask Q&A</span>
+                </button>
+              )}
+
+              {/* PDF Preview Button */}
               {isUploadedPDF && (
                 <button
                   type="button"
@@ -251,6 +324,7 @@ export const PaperCard: React.FC<PaperCardProps> = ({
               )}
             </div>
 
+            {/* Delete Confirmation or Delete Button */}
             {showDeleteConfirm ? (
               <div className="delete-confirm-box">
                 <span className="delete-confirm-text">

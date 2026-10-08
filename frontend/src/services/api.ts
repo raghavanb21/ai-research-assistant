@@ -1,4 +1,4 @@
-import { BackendHealth, Paper, SearchResponse } from '../types';
+import { BackendHealth, Paper, PaperSummary, QAMessage, QAHistoryResponse, SearchResponse } from '../types';
 
 const API_BASE = '/api';
 
@@ -79,3 +79,58 @@ export async function uploadPDF(file: File): Promise<Paper> {
   }
   return res.json();
 }
+
+export async function getPaperSummary(paperId: number): Promise<PaperSummary> {
+  const res = await fetch(`${API_BASE}/ai/summary/${paperId}`);
+  if (!res.ok) {
+    const errorData = await res.json().catch(() => ({}));
+    throw new Error(errorData.detail || `Failed to fetch paper summary`);
+  }
+  return res.json();
+}
+
+export async function generatePaperSummary(paperId: number, forceRegenerate = false): Promise<PaperSummary> {
+  const params = forceRegenerate ? '?force_regenerate=true' : '';
+  const res = await fetch(`${API_BASE}/ai/summarize/${paperId}${params}`, {
+    method: 'POST',
+  });
+  if (!res.ok) {
+    const errorData = await res.json().catch(() => ({}));
+    throw new Error(errorData.detail || `Failed to generate paper summary`);
+  }
+  return res.json();
+}
+
+export async function askPaperQuestion(paperId: number, question: string): Promise<QAMessage> {
+  const res = await fetch(`${API_BASE}/ai/qa/${paperId}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ question }),
+  });
+  if (!res.ok) {
+    const errorData = await res.json().catch(() => ({}));
+    throw new Error(errorData.detail || `Failed to answer question`);
+  }
+  return res.json();
+}
+
+export async function getPaperQAHistory(paperId: number): Promise<QAHistoryResponse> {
+  const res = await fetch(`${API_BASE}/ai/qa/${paperId}`);
+  if (!res.ok) {
+    const errorData = await res.json().catch(() => ({}));
+    throw new Error(errorData.detail || `Failed to fetch Q&A history`);
+  }
+  return res.json();
+}
+
+export async function clearPaperQAHistory(paperId: number): Promise<{ success: boolean; deleted_messages: number }> {
+  const res = await fetch(`${API_BASE}/ai/qa/${paperId}`, {
+    method: 'DELETE',
+  });
+  if (!res.ok) {
+    const errorData = await res.json().catch(() => ({}));
+    throw new Error(errorData.detail || `Failed to clear Q&A history`);
+  }
+  return res.json();
+}
+

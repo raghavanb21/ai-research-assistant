@@ -22,6 +22,8 @@ interface LibraryPanelProps {
   onNavigateToSearch: () => void;
   onOpenUploadModal?: () => void;
   onPreviewPDF?: (paper: Paper) => void;
+  onSummarize?: (paper: Paper) => void;
+  onQA?: (paper: Paper) => void;
 }
 
 export const LibraryPanel: React.FC<LibraryPanelProps> = ({
@@ -32,8 +34,11 @@ export const LibraryPanel: React.FC<LibraryPanelProps> = ({
   onDeletePaper,
   onNavigateToSearch,
   onOpenUploadModal,
-  onPreviewPDF
+  onPreviewPDF,
+  onSummarize,
+  onQA
 }) => {
+
   const [searchQuery, setSearchQuery] = useState('');
   const [sourceFilter, setSourceFilter] = useState<string>('all');
   const [sortBy, setSortBy] = useState<'newest' | 'oldest' | 'year' | 'title'>('newest');
@@ -338,7 +343,10 @@ export const LibraryPanel: React.FC<LibraryPanelProps> = ({
                 isDeleting={deletingId === paper.id}
                 onDelete={handleDelete}
                 onPreviewPDF={onPreviewPDF}
+                onSummarize={onSummarize}
+                onQA={onQA}
               />
+
             ))}
           </div>
         </div>

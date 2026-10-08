@@ -324,3 +324,127 @@ Phase 4 complete. PDF Upload and Processing is fully operational. Users can uplo
 - **Decision**: Added secure `GET /api/pdf/{paper_id}/view` backend endpoint streaming local PDF files with path traversal security checks and `inline` content disposition.
 - **Decision**: Built `PDFViewerModal` embedded browser PDF previewer with direct "Preview PDF" / "View PDF" actions, replacing "No link available" for uploaded documents.
 - **Decision**: Attached physical PDF disk cleanup to `PaperService.delete_paper` to prevent orphaned PDF files on disk.
+
+---
+
+## Task 6 — Summarize Papers with an LLM (Phase 5)
+
+### Prompt / Task
+Implement Phase 5: Summarize Papers with an LLM. Allow the user to select any research paper (search result or uploaded PDF) and ask Google Gemini to generate a structured, comprehensive summary grounded strictly in the actual content of the paper (full text if available, or detailed abstract). Persist and cache summaries in SQLite (`summaries` table).
+
+### Engineering Reasoning
+1. **Content-Grounded Prompting**: Configured `LLMService` to inspect the paper record. When `full_text` is available (from local PDF upload), the prompt includes the extracted body text (with smart truncation for latency); when only `abstract` is available (from search results), the prompt injects the full academic abstract and preprint metadata.
+2. **Structured Summary Architecture**: Prompts Gemini with a structured schema returning:
+   - `### Core Problem & Objective`: The exact research bottleneck addressed.
+   - `### Key Innovation & Methodology`: Algorithmic innovations, architecture, and theoretical formulation.
+   - `### Main Findings & Results`: Empirical benchmarks, BLEU/accuracy gains, and performance data.
+   - `### Limitations & Future Work`: Assumptions, constraints, and future avenues.
+   - `key_points`: 4–6 concise, actionable takeaway bullet points.
+3. **Database Caching & Re-generation**: Generated summaries are cached in SQLite's `summaries` table linked via foreign key to `paper.id`. A dedicated `GET /api/ai/summary/{paper_id}` endpoint returns cached summaries in milliseconds. A `force_regenerate=true` query parameter allows on-demand fresh re-analysis.
+4. **Resilient Multi-Model Fallback Chain**: Configured a graceful fallback chain (`gemini-3.5-flash` -> `gemini-3.8-flash` -> `gemini-flash-latest` -> `gemini-3.1-flash-lite`) to transparently withstand transient 503 load spikes on Google's free tier.
+5. **Modern Frontend UX (`SummaryModal.tsx`)**:
+   - Header displaying context provenance badge (*"Grounded in Full PDF Text"* vs *"Grounded in Academic Abstract"*).
+   - Prominent *Core Key Takeaways* cards with ordered badge numbers.
+   - Formatted markdown rendering for headings and paragraphs.
+   - 1-click "Copy Summary" button with live visual feedback.
+   - "Regenerate" and "Ask Questions About Paper" direct transition buttons.
+
+### Planned Actions
+1. Create `SummaryResponse` schema in `backend/app/schemas/ai.py`.
+2. Implement `LLMService.generate_summary` with fallback chain and JSON parsing in `backend/app/services/llm_service.py`.
+3. Create `POST /api/ai/summarize/{paper_id}` and `GET /api/ai/summary/{paper_id}` in `backend/app/routers/ai.py`.
+4. Update frontend API client (`generatePaperSummary`, `getPaperSummary`).
+5. Create `frontend/src/components/SummaryModal.tsx`.
+6. Add "Summarize" / "View Summary" action buttons to `PaperCard.tsx`.
+7. Verify summarization quality and SQLite caching.
+
+### Actions Taken
+- Created `backend/app/schemas/ai.py` with `SummaryResponse` and `SummarizeRequest`.
+- Built `LLMService` in `backend/app/services/llm_service.py` with multi-model fallback and JSON parser.
+- Built `backend/app/routers/ai.py` and mounted it in `backend/app/main.py`.
+- Built `frontend/src/components/SummaryModal.tsx`.
+- Updated `PaperCard.tsx`, `LibraryPanel.tsx`, `SearchPanel.tsx`, and `App.tsx`.
+- Added CSS styles for `SummaryModal` and summary action buttons.
+
+### Verification
+- `POST /api/ai/summarize/{paper_id}`: Generated structured markdown summary with 5 key takeaways using `gemini-3.5-flash` (status 200).
+- `GET /api/ai/summary/{paper_id}`: Verified instant retrieval from SQLite database cache.
+- Verified grounding in paper abstract and PDF full text.
+
+---
+
+## Task 7 — Ask Questions About a Paper (Phase 6)
+
+### Prompt / Task
+Implement Phase 6: Ask Questions About a Paper. Allow the user to ask natural-language questions about a selected paper (e.g., *"What problem does this paper address?"*, *"What is the main idea of the proposed approach?"*, *"What datasets are used?"*, *"What are the major limitations?"*, *"How does this method compare with the baselines?"*). Answers must be strictly grounded in the paper's content with anti-hallucination guardrails, and conversation history must persist in SQLite (`qa_messages` table).
+
+### Engineering Reasoning
+1. **Strict Anti-Hallucination Guardrails**: Injected explicit system prompt instructions:
+   - Ground all answers strictly in the provided paper context (title, authors, abstract, body text).
+   - If the paper does NOT contain the requested information (e.g. a specific baseline or dataset is omitted), explicitly state that the paper does not mention it rather than fabricating facts.
+2. **Conversational Multi-Turn Context**: Passed previous conversation turns from SQLite `qa_messages` to Gemini so users can ask follow-up questions seamlessly.
+3. **SQLite Persistence & Cascade Deletions**: Persisted user questions (`role='user'`) and assistant answers (`role='assistant'`) with context tags in SQLite `qa_messages`. Added `DELETE /api/ai/qa/{paper_id}` to reset chat history.
+4. **Interactive Suggested Question Chips**: Provided 5 pre-built clickable prompt chips in `QAModal.tsx` matching the user's exact example questions:
+   - *"What problem does this paper address?"*
+   - *"What is the main idea of the proposed approach?"*
+   - *"What datasets are used?"*
+   - *"What are the major limitations?"*
+   - *"How does this method compare with the baselines?"*
+5. **Polished Chat UI (`QAModal.tsx`)**:
+   - Distinct user and assistant message bubbles with timestamps and AI avatars.
+   - Markdown rendering for headings, bullet points, numbered lists, and bold text.
+   - Individual "Copy" answer buttons.
+   - Multi-line expanding textarea with Enter-to-send shortcut.
+   - Live thinking / reasoning pulse animation during generation.
+   - Clear history confirmation dialog.
+
+### Planned Actions
+1. Create `QARequest`, `QAMessageResponse`, and `QAHistoryResponse` schemas in `backend/app/schemas/ai.py`.
+2. Implement `LLMService.answer_question`, `get_qa_history`, and `clear_qa_history` in `backend/app/services/llm_service.py`.
+3. Create `POST /api/ai/qa/{paper_id}`, `GET /api/ai/qa/{paper_id}`, and `DELETE /api/ai/qa/{paper_id}` endpoints in `backend/app/routers/ai.py`.
+4. Update frontend API client (`askPaperQuestion`, `getPaperQAHistory`, `clearPaperQAHistory`).
+5. Create `frontend/src/components/QAModal.tsx` with suggested prompt chips and chat history.
+6. Add "Ask Q&A" action buttons to `PaperCard.tsx` and integrate modals in `App.tsx`.
+7. Add CSS styles for Q&A chat bubbles, suggested chips, and input toolbar.
+8. Verify all 5 sample questions and anti-hallucination behavior via automated test scripts and test frontend build.
+
+### Actions Taken
+- Created Q&A endpoints and schemas in `backend/app/schemas/ai.py` and `backend/app/routers/ai.py`.
+- Built conversational memory and anti-hallucination prompting in `backend/app/services/llm_service.py`.
+- Created `frontend/src/components/QAModal.tsx`.
+- Updated `PaperCard.tsx`, `LibraryPanel.tsx`, `SearchPanel.tsx`, `App.tsx`, and `index.css`.
+- Executed integration test suite verifying Q&A answers, anti-hallucination responses, and chat history lifecycle.
+- Tested `npm run build` with 0 TypeScript/bundler errors.
+
+### Files Changed
+- `backend/app/schemas/ai.py` (Created)
+- `backend/app/schemas/__init__.py` (Updated)
+- `backend/app/services/llm_service.py` (Created)
+- `backend/app/services/__init__.py` (Updated)
+- `backend/app/routers/ai.py` (Created)
+- `backend/app/main.py` (Updated)
+- `frontend/src/types/index.ts` (Updated)
+- `frontend/src/services/api.ts` (Updated)
+- `frontend/src/components/SummaryModal.tsx` (Created)
+- `frontend/src/components/QAModal.tsx` (Created)
+- `frontend/src/components/PaperCard.tsx` (Updated)
+- `frontend/src/components/LibraryPanel.tsx` (Updated)
+- `frontend/src/components/SearchPanel.tsx` (Updated)
+- `frontend/src/App.tsx` (Updated)
+- `frontend/src/index.css` (Updated)
+- `AGENT_LOG.md` (Appended Task 6 & Task 7)
+
+### Verification
+- Tested all 5 natural-language questions on academic papers (*"Attention Is All You Need"*):
+  1. *What problem does this paper address?* -> Accurately explained sequential computation constraints of RNNs/CNNs.
+  2. *What is the main idea of the proposed approach?* -> Accurately explained pure self-attention mechanism dispensing with recurrence/convolutions.
+  3. *What datasets are used?* -> Accurately identified WMT 2014 English-to-German, WMT 2014 English-to-French, and English constituency parsing datasets.
+  4. *What are the major limitations?* -> Anti-hallucination guardrail correctly stated that the abstract does not mention limitations.
+  5. *How does this method compare with the baselines?* -> Accurately reported BLEU gains (+2 over ensembles on EN-DE, 41.8 on EN-FR) and training cost comparisons.
+- Multi-turn conversation history test: Verified 18 messages stored and retrieved from SQLite `qa_messages`.
+- Clear history test: Verified `DELETE /api/ai/qa/{paper_id}` cleared all messages to 0.
+- Frontend build: `npm run build` compiled with 0 errors in 3.67s.
+
+### Result
+Phases 5 and 6 are complete. The AI Research Assistant can now generate comprehensive structured summaries and answer natural-language questions grounded in paper content with strict anti-hallucination guardrails and multi-turn SQLite conversation persistence.
+

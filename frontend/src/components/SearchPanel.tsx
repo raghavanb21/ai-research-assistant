@@ -15,9 +15,17 @@ const SAMPLE_QUERIES = [
 interface SearchPanelProps {
   savedPapers: Paper[];
   onSavePaper: (paper: Paper) => Promise<void>;
+  onSummarize?: (paper: Paper) => void;
+  onQA?: (paper: Paper) => void;
 }
 
-export const SearchPanel: React.FC<SearchPanelProps> = ({ savedPapers, onSavePaper }) => {
+export const SearchPanel: React.FC<SearchPanelProps> = ({
+  savedPapers,
+  onSavePaper,
+  onSummarize,
+  onQA
+}) => {
+
   const [query, setQuery] = useState('');
   const [source, setSource] = useState<'openalex' | 'arxiv' | 'all'>('openalex');
   const [limit, setLimit] = useState<number>(10);
@@ -262,18 +270,33 @@ export const SearchPanel: React.FC<SearchPanelProps> = ({ savedPapers, onSavePap
                 const key = getPaperKey(paper);
                 const saved = isPaperSaved(paper);
                 const isSaving = savingPaperKey === key;
+                // If already saved, find the database record to get the paper ID and has_summary status
+                const matchedSavedPaper = saved
+                  ? savedPapers.find(
+                      (p) =>
+                        (paper.arxiv_id && p.arxiv_id?.toLowerCase() === paper.arxiv_id.toLowerCase()) ||
+                        (paper.doi && p.doi?.toLowerCase() === paper.doi.toLowerCase()) ||
+                        p.title.trim().toLowerCase() === paper.title.trim().toLowerCase()
+                    )
+                  : null;
+
+                const displayPaper = matchedSavedPaper || paper;
+
                 return (
                   <PaperCard 
                     key={`${paper.arxiv_id || paper.doi || idx}-${idx}`} 
-                    paper={paper}
+                    paper={displayPaper}
                     mode="search"
                     isSaved={saved}
                     isSaving={isSaving}
                     onSave={handleSave}
+                    onSummarize={onSummarize}
+                    onQA={onQA}
                   />
                 );
               })}
             </div>
+
           )}
         </div>
       )}

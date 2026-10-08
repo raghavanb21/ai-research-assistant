@@ -10,7 +10,9 @@ import {
   Check,
   AlertCircle,
   X,
-  UploadCloud
+  UploadCloud,
+  Sparkles,
+  MessageSquare
 } from 'lucide-react';
 import { BackendHealth, Paper } from './types';
 import { checkHealth, getSavedPapers, savePaper, deletePaper } from './services/api';
@@ -18,6 +20,8 @@ import SearchPanel from './components/SearchPanel';
 import LibraryPanel from './components/LibraryPanel';
 import PDFUploadModal from './components/PDFUploadModal';
 import PDFViewerModal from './components/PDFViewerModal';
+import SummaryModal from './components/SummaryModal';
+import QAModal from './components/QAModal';
 
 interface Toast {
   id: string;
@@ -39,6 +43,8 @@ export const App: React.FC = () => {
   // Modal states
   const [isUploadModalOpen, setIsUploadModalOpen] = useState<boolean>(false);
   const [previewPaper, setPreviewPaper] = useState<Paper | null>(null);
+  const [summaryPaper, setSummaryPaper] = useState<Paper | null>(null);
+  const [qaPaper, setQaPaper] = useState<Paper | null>(null);
 
   // Toast notifications
   const [toasts, setToasts] = useState<Toast[]>([]);
@@ -132,15 +138,32 @@ export const App: React.FC = () => {
     try {
       await deletePaper(paperId);
       setSavedPapers((prev) => prev.filter((p) => p.id !== paperId));
-      if (previewPaper && previewPaper.id === paperId) {
-        setPreviewPaper(null);
-      }
+      if (previewPaper && previewPaper.id === paperId) setPreviewPaper(null);
+      if (summaryPaper && summaryPaper.id === paperId) setSummaryPaper(null);
+      if (qaPaper && qaPaper.id === paperId) setQaPaper(null);
       showToast('Paper removed from library', 'info');
     } catch (err: any) {
       console.error('Delete paper error:', err);
       showToast(err.message || 'Failed to delete paper', 'error');
       throw err;
     }
+  };
+
+  // Handle opening summary modal
+  const handleOpenSummary = (paper: Paper) => {
+    setSummaryPaper(paper);
+  };
+
+  // Handle opening QA modal
+  const handleOpenQA = (paper: Paper) => {
+    setQaPaper(paper);
+  };
+
+  // Update paper's summary status in library when generated
+  const handleSummaryGenerated = (paperId: number) => {
+    setSavedPapers((prev) =>
+      prev.map((p) => (p.id === paperId ? { ...p, has_summary: true } : p))
+    );
   };
 
   return (
@@ -176,6 +199,23 @@ export const App: React.FC = () => {
         paper={previewPaper}
         isOpen={Boolean(previewPaper)}
         onClose={() => setPreviewPaper(null)}
+      />
+
+      {/* LLM Paper Summary Modal */}
+      <SummaryModal
+        paper={summaryPaper}
+        isOpen={Boolean(summaryPaper)}
+        onClose={() => setSummaryPaper(null)}
+        onOpenQA={handleOpenQA}
+        onSummaryGenerated={handleSummaryGenerated}
+      />
+
+      {/* Natural Language Paper Q&A Modal */}
+      <QAModal
+        paper={qaPaper}
+        isOpen={Boolean(qaPaper)}
+        onClose={() => setQaPaper(null)}
+        onOpenSummary={handleOpenSummary}
       />
 
       {/* Top Navigation Bar */}
@@ -251,7 +291,7 @@ export const App: React.FC = () => {
             Discover, Analyze & Query Academic Research
           </h1>
           <p className="hero-subtitle" style={{ fontSize: '0.95rem', marginBottom: '1rem' }}>
-            Search open-access academic repositories (OpenAlex & arXiv), upload PDF research papers locally, and organize your persistent research library.
+            Search open-access academic repositories, upload PDF papers, generate deep AI summaries, and ask natural-language questions grounded in paper content.
           </p>
 
           <div style={{ display: 'flex', justifyContent: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
@@ -264,8 +304,12 @@ export const App: React.FC = () => {
               <span>100% Free Public Search</span>
             </div>
             <div className="status-pill" style={{ padding: '0.35rem 0.85rem' }}>
-              <UploadCloud size={14} style={{ color: 'var(--accent-warning, #f59e0b)' }} />
-              <span>Local PyMuPDF Extraction & PDF Preview</span>
+              <Sparkles size={14} style={{ color: '#6366f1' }} />
+              <span>LLM Content Summaries</span>
+            </div>
+            <div className="status-pill" style={{ padding: '0.35rem 0.85rem' }}>
+              <MessageSquare size={14} style={{ color: '#10b981' }} />
+              <span>Grounded Research Q&A</span>
             </div>
             <div className="status-pill" style={{ padding: '0.35rem 0.85rem' }}>
               <FolderArchive size={14} style={{ color: 'var(--accent-info)' }} />
@@ -279,6 +323,8 @@ export const App: React.FC = () => {
           <SearchPanel
             savedPapers={savedPapers}
             onSavePaper={handleSavePaper}
+            onSummarize={handleOpenSummary}
+            onQA={handleOpenQA}
           />
         )}
 
@@ -292,13 +338,15 @@ export const App: React.FC = () => {
             onNavigateToSearch={() => setActiveTab('search')}
             onOpenUploadModal={() => setIsUploadModalOpen(true)}
             onPreviewPDF={(paper) => setPreviewPaper(paper)}
+            onSummarize={handleOpenSummary}
+            onQA={handleOpenQA}
           />
         )}
       </main>
 
       {/* Footer */}
       <footer className="app-footer">
-        <p>AI Research Assistant &bull; Single-User Architecture &bull; Built with FastAPI & React</p>
+        <p>AI Research Assistant &bull; Built with FastAPI & React &bull; Raghavan Balanathan</p>
       </footer>
     </div>
   );
