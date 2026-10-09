@@ -203,7 +203,6 @@ All variables are read from `backend/.env`. Copy from `.env.example` to get star
 | `LLM_PROVIDER` | `gemini` | | LLM backend: `gemini` or `openai` |
 | `LLM_MODEL` | `gemini-3.5-flash` | | Model identifier (overridden by fallback logic) |
 | `GEMINI_API_KEY` | — | (AI features) | Google Gemini API key |
-| `OPENAI_API_KEY` | — | (if using OpenAI) | OpenAI API key |
 
 > The `data/` directory (database + PDFs) is created automatically on first run. It is excluded from version control via `.gitignore`.
 
@@ -272,4 +271,4 @@ pytest tests/ -v
 
 ## License
 
-This project is for academic and educational use.
+This project is for academic and educational use of CS593 AI4SE
